@@ -50,7 +50,7 @@ Follow these steps to set up the project on your local machine:
 ### 2. Clone and Install
 ```bash
 # Clone the repository
-git clone [<https://github.com/mohakamran/jobai-japan>](https://github.com/mohakamran/jobai-japan
+git clone https://github.com/mohakamran/jobai-japan
 cd jobai-japan
 
 # Install dependencies
