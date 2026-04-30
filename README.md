@@ -4,6 +4,8 @@
 
 JobAI Japan is a high-performance web platform designed to streamline the job hunting experience for international professionals targeting the Japanese market. It combines artificial intelligence with a clean, industrial design to manage the entire career lifecycle—from document translation to application tracking.
 
+<img width="2726" height="1532" alt="jobai-png" src="https://github.com/user-attachments/assets/c3196215-121a-4f05-a1db-c4b825fd808f" />
+
 ## 🚀 Core Features
 
 ### 📄 AI Document Hub
@@ -48,7 +50,7 @@ Follow these steps to set up the project on your local machine:
 ### 2. Clone and Install
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone [<https://github.com/mohakamran/jobai-japan>](https://github.com/mohakamran/jobai-japan
 cd jobai-japan
 
 # Install dependencies
