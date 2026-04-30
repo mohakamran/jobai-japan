@@ -11,11 +11,29 @@ import DocumentHub from './components/DocumentHub';
 import Applications from './components/Applications';
 import Settings from './components/Settings';
 import Login from './components/Login';
+import Onboarding from './components/Onboarding';
 import { AuthProvider, useAuth } from './lib/AuthContext';
+import { userProfileService, UserProfile } from './services/dataService';
 
 function AppContent() {
   const { user, loading } = useAuth();
   const [currentView, setCurrentView] = React.useState('/');
+  const [profile, setProfile] = React.useState<UserProfile | null>(null);
+  const [checkingProfile, setCheckingProfile] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!user) {
+      const timer = setTimeout(() => setCheckingProfile(false), 0);
+      return () => clearTimeout(timer);
+    }
+
+    const unsubscribe = userProfileService.subscribeToProfile(user.uid, (p) => {
+      setProfile(p);
+      setCheckingProfile(false);
+    });
+
+    return unsubscribe;
+  }, [user]);
 
   React.useEffect(() => {
     const titles: Record<string, string> = {
@@ -28,7 +46,7 @@ function AppContent() {
     document.title = titles[currentView] || 'JobAI Japan';
   }, [currentView]);
 
-  if (loading) {
+  if (loading || (user && checkingProfile)) {
     return (
       <div className="h-screen bg-[#0F172A] flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
@@ -38,6 +56,13 @@ function AppContent() {
 
   if (!user) {
     return <Login />;
+  }
+
+  // Profile completeness check
+  const isProfileIncomplete = !profile?.title || (profile.skills?.length || 0) === 0;
+
+  if (isProfileIncomplete) {
+    return <Onboarding onComplete={() => setCurrentView('/')} />;
   }
 
   const renderContent = () => {

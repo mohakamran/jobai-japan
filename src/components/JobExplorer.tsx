@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../lib/AuthContext';
-import { applicationService, notificationService } from '../services/dataService';
+import { applicationService, notificationService, userProfileService, UserProfile } from '../services/dataService';
 
 const MOCK_JOBS = [
   {
@@ -19,9 +19,9 @@ const MOCK_JOBS = [
     company: 'Rakuten Group',
     location: 'Tokyo (Remote Friendly)',
     salary: '¥8M - ¥12M',
-    matchScore: 98,
     description: 'Lead the frontend development of our global rewards platform using React and TypeScript. Focus on high-performance rendering and seamless localisations.',
-    skills: ['React', 'TypeScript', 'Node.js', 'Japanese N2']
+    skills: ['React', 'TypeScript', 'Node.js'],
+    jlptRequirement: 'N2'
   },
   {
     id: '2',
@@ -29,9 +29,9 @@ const MOCK_JOBS = [
     company: 'Mercari Inc.',
     location: 'Roppongi, Tokyo',
     salary: '¥10M - ¥15M',
-    matchScore: 85,
     description: 'Design and implement LLM-based solutions for Japan\'s largest marketplace. Work on RAG systems and multi-modal search optimization.',
-    skills: ['Python', 'PyTorch', 'LLMs', 'MLOps']
+    skills: ['Python', 'PyTorch', 'LLMs', 'MLOps'],
+    jlptRequirement: 'None'
   },
   {
     id: '3',
@@ -39,21 +39,72 @@ const MOCK_JOBS = [
     company: 'LINE Corp.',
     location: 'Shinjuku, Tokyo',
     salary: '¥7M - ¥10M',
-    matchScore: 79,
     description: 'Build robust messaging features and financial services. High emphasis on system scalability and clean architecture.',
-    skills: ['Next.js', 'Go', 'AWS', 'MySQL']
+    skills: ['Next.js', 'Go', 'AWS', 'MySQL'],
+    jlptRequirement: 'N3'
+  },
+  {
+    id: '4',
+    title: 'Cloud Infrastructure Engineer',
+    company: 'Sony Interactive',
+    location: 'Minato, Tokyo',
+    salary: '¥9M - ¥13M',
+    description: 'Optimize global cloud infrastructure for gaming services. Focus on high availability and low latency systems.',
+    skills: ['AWS', 'Kubernetes', 'Terraform', 'CI/CD'],
+    jlptRequirement: 'N4'
   }
 ];
 
 export default function JobExplorer() {
   const { user } = useAuth();
+  const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [applyingId, setApplyingId] = React.useState<string | null>(null);
   const [appliedIds, setAppliedIds] = React.useState<string[]>([]);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [locationFilter, setLocationFilter] = React.useState('All');
   const [salaryFilter, setSalaryFilter] = React.useState('All');
 
-  const filteredJobs = MOCK_JOBS.filter(job => {
+  // Pagination
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 3; // Small number for mock data visibility
+
+  React.useEffect(() => {
+    if (!user) return;
+    return userProfileService.subscribeToProfile(user.uid, setProfile);
+  }, [user]);
+
+  const calculateJobMatch = (job: typeof MOCK_JOBS[0]) => {
+    if (!profile) return 50;
+    let score = 30; // Base score
+
+    // Skill matches
+    const userSkills = profile.skills || [];
+    const matchingSkills = job.skills.filter(s => 
+      userSkills.some(us => us.toLowerCase() === s.toLowerCase())
+    );
+    score += (matchingSkills.length / job.skills.length) * 40;
+
+    // JLPT matches
+    const levels = ['None', 'N5', 'N4', 'N3', 'N2', 'N1'];
+    const userLv = levels.indexOf(profile.jlptLevel || 'None');
+    const jobLv = levels.indexOf(job.jlptRequirement || 'None');
+    if (userLv >= jobLv && jobLv > 0) score += 20;
+    else if (jobLv === 0) score += 10;
+
+    // Location match
+    if (profile.location && job.location.toLowerCase().includes(profile.location.toLowerCase())) {
+      score += 10;
+    }
+
+    return Math.min(Math.round(score), 100);
+  };
+
+  const scoredJobs = MOCK_JOBS.map(job => ({
+    ...job,
+    matchScore: calculateJobMatch(job)
+  })).sort((a, b) => b.matchScore - a.matchScore);
+
+  const filteredJobs = scoredJobs.filter(job => {
     const matchesSearch = 
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -74,11 +125,16 @@ export default function JobExplorer() {
     return matchesSearch && matchesLocation && matchesSalary;
   });
 
-  const handleApply = async (job: typeof MOCK_JOBS[0]) => {
-    if (!user) return;
+  const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
+  const pagedJobs = filteredJobs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleApply = async (job: typeof scoredJobs[0]) => {
+    if (!user || !profile) return;
     setApplyingId(job.id);
     
     try {
+      // Send data to application (in our case, saving to applications collection)
+      // We include the user's latest profile data "snapshots" in the application
       await applicationService.applyToJob({
         userId: user.uid,
         jobId: job.id,
@@ -87,7 +143,8 @@ export default function JobExplorer() {
         status: 'Applied',
         location: job.location,
         salary: job.salary,
-        matchScore: job.matchScore
+        matchScore: job.matchScore,
+        notes: `Applied with professional profile: ${profile.title}. Skills included: ${profile.skills?.join(', ')}.`
       });
 
       await notificationService.createNotification({
@@ -171,12 +228,12 @@ export default function JobExplorer() {
 
       {/* Job List */}
       <div className="grid grid-cols-1 gap-6">
-        {filteredJobs.length === 0 ? (
+        {pagedJobs.length === 0 ? (
           <div className="bg-slate-800/50 border border-slate-700 rounded-3xl p-20 text-center">
             <Zap className="w-12 h-12 text-slate-700 mx-auto mb-4" />
             <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">No matching jobs found. Try adjusting your filters.</p>
           </div>
-        ) : filteredJobs.map((job) => (
+        ) : pagedJobs.map((job) => (
           <motion.div 
             key={job.id}
             whileHover={{ x: 4 }}
@@ -239,6 +296,41 @@ export default function JobExplorer() {
           </motion.div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 py-8">
+          <button 
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-400 hover:text-white disabled:opacity-30 transition-all font-black uppercase text-[10px] tracking-widest flex items-center gap-2"
+          >
+            Previous
+          </button>
+          <div className="flex items-center gap-2">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`w-10 h-10 rounded-xl text-[10px] font-black transition-all ${
+                  currentPage === page 
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" 
+                    : "bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+          <button 
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-400 hover:text-white disabled:opacity-30 transition-all font-black uppercase text-[10px] tracking-widest flex items-center gap-2"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

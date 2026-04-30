@@ -48,12 +48,35 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 // Interfaces
+export interface Education {
+  school: string;
+  degree: string;
+  field: string;
+  startYear: string;
+  endYear: string;
+}
+
+export interface Experience {
+  company: string;
+  position: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  description: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
   jlptLevel: string;
   skills: string[];
+  title?: string;
+  introduction?: string;
+  education?: Education[];
+  experience?: Experience[];
+  location?: string;
   photoURL?: string;
   masterResume?: string;
   rirekisho?: string;
@@ -227,9 +250,12 @@ export const applicationService = {
 
   async deleteApplication(appId: string): Promise<void> {
     const path = `applications/${appId}`;
+    console.log(`Attempting to delete application: ${appId} at path: ${path}`);
     try {
       await deleteDoc(doc(db, 'applications', appId));
+      console.log(`Successfully deleted application: ${appId}`);
     } catch (error) {
+      console.error(`Failed to delete application: ${appId}`, error);
       handleFirestoreError(error, OperationType.DELETE, path);
     }
   }

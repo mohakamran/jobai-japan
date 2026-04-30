@@ -21,10 +21,15 @@ service cloud.firestore {
         && data.name is string && data.name.size() <= 100
         && data.email is string && data.email.size() <= 100
         && (data.get('jlptLevel', 'None') in ['N1', 'N2', 'N3', 'N4', 'N5', 'None'])
+        && (data.get('title', '') is string && data.get('title', '').size() <= 200)
+        && (data.get('introduction', '') is string && data.get('introduction', '').size() <= 2000)
+        && (data.get('location', '') is string && data.get('location', '').size() <= 200)
+        && (data.get('education', []) is list)
+        && (data.get('experience', []) is list)
         && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 2000)
-        && (data.get('masterResume', '') is string && data.get('masterResume', '').size() <= 50000)
-        && (data.get('rirekisho', '') is string && data.get('rirekisho', '').size() <= 60000)
-        && (data.get('shokumu', '') is string && data.get('shokumu', '').size() <= 60000)
+        && (data.get('masterResume', '') is string && data.get('masterResume', '').size() <= 100000)
+        && (data.get('rirekisho', '') is string && data.get('rirekisho', '').size() <= 100000)
+        && (data.get('shokumu', '') is string && data.get('shokumu', '').size() <= 100000)
         && data.createdAt is timestamp;
     }
 
@@ -57,7 +62,7 @@ service cloud.firestore {
       allow update: if isOwner(userId) && isValidUserProfile(incoming())
         && incoming().id == existing().id
         && incoming().createdAt == existing().createdAt
-        && (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'skills', 'masterResume', 'rirekisho', 'shokumu', 'jlptLevel', 'preferredLocations', 'updatedAt', 'photoURL']))
+        && (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'skills', 'title', 'introduction', 'education', 'experience', 'location', 'masterResume', 'rirekisho', 'shokumu', 'jlptLevel', 'updatedAt', 'photoURL']))
         && incoming().updatedAt == request.time;
     }
 

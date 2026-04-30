@@ -20,6 +20,7 @@ import {
 import { motion } from 'motion/react';
 import { useAuth } from '../lib/AuthContext';
 import { applicationService, Application, userProfileService, UserProfile } from '../services/dataService';
+import { cn } from '../lib/utils';
 
 interface StatCardProps {
   title: string;
@@ -77,12 +78,61 @@ export default function Dashboard() {
     };
   }, [user]);
 
+
+  const calculateCompletion = () => {
+    if (!profile) return 0;
+    let score = 0;
+    if (profile.name) score += 5;
+    if (profile.email) score += 5;
+    if (profile.title) score += 10;
+    if (profile.introduction) score += 15;
+    if (profile.jlptLevel && profile.jlptLevel !== 'None') score += 5;
+    if (profile.location) score += 5;
+    if (profile.skills && profile.skills.length > 0) score += 15;
+    if (profile.education && profile.education.length > 0) score += 15;
+    if (profile.experience && profile.experience.length > 0) score += 25;
+    return score;
+  };
+
+  const completion = calculateCompletion();
+
   const stats = {
     applied: apps.length,
     interviews: apps.filter(a => a.status === 'Interview').length,
     offers: apps.filter(a => a.status === 'Offer').length,
     rejected: apps.filter(a => a.status === 'Rejected').length,
   };
+
+  if (loading) {
+    return <div className="h-64 flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>;
+  }
+
+  const MOCK_JOBS_RAW = [
+    { id: '1', title: 'Senior Frontend Engineer', company: 'Rakuten Group', location: 'Tokyo', skills: ['React', 'TypeScript', 'Node.js'], jlptRequirement: 'N2', logo: 'R', logoBg: 'bg-[#E11F26]' },
+    { id: '2', title: 'AI Solutions Architect', company: 'Mercari Inc.', location: 'Tokyo', skills: ['Python', 'LLMs'], jlptRequirement: 'None', logo: 'M', logoBg: 'bg-slate-700' },
+    { id: '3', title: 'Fullstack Developer', company: 'LINE Corp.', location: 'Tokyo', skills: ['Next.js', 'AWS'], jlptRequirement: 'N3', logo: 'L', logoBg: 'bg-[#00A1E9]' },
+  ];
+
+  const calculateJobMatch = (job: typeof MOCK_JOBS_RAW[0]) => {
+    if (!profile) return 50;
+    let score = 30;
+    const userSkills = profile.skills || [];
+    const matchingSkills = job.skills.filter(s => userSkills.some(us => us.toLowerCase() === s.toLowerCase()));
+    score += (matchingSkills.length / job.skills.length) * 40;
+    const levels = ['None', 'N5', 'N4', 'N3', 'N2', 'N1'];
+    const userLv = levels.indexOf(profile.jlptLevel || 'None');
+    const jobLv = levels.indexOf(job.jlptRequirement || 'None');
+    if (userLv >= jobLv && jobLv > 0) score += 20;
+    else if (jobLv === 0) score += 10;
+    return Math.min(Math.round(score), 100);
+  };
+
+  const topMatches = MOCK_JOBS_RAW.map(job => ({
+    ...job,
+    score: calculateJobMatch(job)
+  })).sort((a, b) => b.score - a.score);
 
   const chartData = [
     { name: 'Applied', value: stats.applied, color: '#6366F1' },
@@ -91,24 +141,35 @@ export default function Dashboard() {
     { name: 'Offers', value: stats.offers, color: '#F59E0B' },
   ];
 
-  if (loading) {
-    return <div className="h-64 flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-    </div>;
-  }
-
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <section className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-display font-bold text-white">Kon’nichiwa, {profile?.name?.split(' ')[0] || 'User'}</h2>
-          <p className="text-slate-400 mt-2">Your AI-powered job search is at {stats.applied > 0 ? '92%' : '0%'} efficiency today.</p>
+          <h2 className="text-3xl font-display font-bold text-white tracking-tight">Kon’nichiwa, {profile?.name?.split(' ')[0] || 'User'}</h2>
+          <p className="text-slate-400 mt-2 font-medium">Your AI-powered job search is at <span className="text-indigo-400 font-bold">{completion}%</span> efficiency today.</p>
         </div>
-        <button className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2">
-          <Zap className="w-4 h-4" />
-          <span>Refresh AI Match</span>
-        </button>
+        
+        {completion < 100 && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-4 bg-indigo-600/10 border border-indigo-500/30 p-4 rounded-2xl"
+          >
+            <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/20">
+              <Zap className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Profile Incomplete</p>
+              <button 
+                onClick={() => window.location.hash = '#/settings'}
+                className="text-indigo-400 text-xs font-bold hover:text-indigo-300 transition-colors mt-1 underline underline-offset-4"
+              >
+                Reach 100% for Elite matching
+              </button>
+            </div>
+          </motion.div>
+        )}
       </section>
 
       {/* Stats Grid */}
@@ -116,13 +177,19 @@ export default function Dashboard() {
         <StatCard title="Applications" value={stats.applied.toString()} icon={Briefcase} change="+0%" color="slate" />
         <StatCard title="Response Rate" value={stats.applied > 0 ? `${Math.round((stats.interviews/stats.applied)*100)}%` : '0%'} icon={TrendingUp} change="v. Avg 8%" color="slate" />
         <StatCard title="Interviews" value={stats.interviews.toString()} icon={Calendar} change="Active" color="slate" />
-        <div className="bg-indigo-600/20 p-6 rounded-2xl border border-indigo-500 shadow-lg group hover:bg-indigo-600/30 transition-all">
-          <div className="text-indigo-300 text-[10px] font-bold uppercase tracking-widest mb-2">AI Match Score</div>
-          <div className="text-4xl font-display font-bold flex items-baseline gap-2 text-white">
-            92 <span className="text-indigo-400 text-sm font-normal">/ 100</span>
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg group hover:border-indigo-500 transition-all relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 text-indigo-500/20">
+            <Zap className="w-8 h-8" />
           </div>
-          <div className="mt-2 text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded w-fit font-bold uppercase tracking-tighter">
-            Elite Access
+          <div className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Efficiency Rating</div>
+          <div className="text-4xl font-display font-bold flex items-baseline gap-2 text-white">
+            {completion} <span className="text-slate-600 text-sm font-normal">/ 100</span>
+          </div>
+          <div className={cn(
+            "mt-2 text-[10px] px-2 py-0.5 rounded w-fit font-black uppercase tracking-widest",
+            completion === 100 ? "bg-emerald-500/20 text-emerald-400" : "bg-indigo-500/20 text-indigo-300"
+          )}>
+            {completion === 100 ? 'Elite Access' : 'Standard Tier'}
           </div>
         </div>
       </div>
@@ -138,11 +205,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="p-6 space-y-4">
-              {[
-                { company: 'Rakuten Group', title: 'Senior Frontend Engineer', score: 98, tags: ['React', 'N2 Match'], logo: 'R', logoBg: 'bg-[#E11F26]' },
-                { company: 'Mercari Inc.', title: 'AI Solutions Architect', score: 85, tags: ['Python', 'LLMs'], logo: 'M', logoBg: 'bg-slate-700' },
-                { company: 'LINE Corp.', title: 'Fullstack Developer', score: 79, tags: ['Next.js', 'AWS'], logo: 'L', logoBg: 'bg-[#00A1E9]' },
-              ].map((job, i) => (
+              {topMatches.map((job, i) => (
                 <div key={i} className="p-5 bg-slate-900/50 rounded-2xl border border-slate-700/50 flex items-center justify-between group cursor-pointer hover:border-indigo-500 hover:bg-slate-900 transition-all shadow-sm">
                   <div className="flex gap-5 items-center">
                     <div className={`w-12 h-12 ${job.logoBg} rounded-xl flex items-center justify-center p-2 text-white font-black text-xl shadow-inner`}>
@@ -150,11 +213,11 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <h4 className="font-display font-bold text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight">{job.title}</h4>
-                      <p className="text-xs text-slate-500 mt-1 font-medium">{job.company} • Tokyo</p>
+                      <p className="text-xs text-slate-500 mt-1 font-medium">{job.company} • {job.location}</p>
                       <div className="flex gap-2 mt-3">
-                        {job.tags.map(tag => (
-                          <span key={tag} className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                            {tag}
+                        {job.skills.slice(0, 2).map(skill => (
+                          <span key={skill} className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                            {skill}
                           </span>
                         ))}
                       </div>
