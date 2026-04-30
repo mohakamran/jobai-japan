@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user professional information, skills, and preferences.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "masterResume": { "type": "string" },
+        "rirekisho": { "type": "string" },
+        "shokumu": { "type": "string" },
+        "jlptLevel": { "type": "string", "enum": ["N1", "N2", "N3", "N4", "N5", "None"] },
+        "preferredLocations": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "name", "email", "createdAt"]
+    },
+    "Job": {
+      "title": "Job Posting",
+      "description": "Information about a job opportunity in Japan.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "company": { "type": "string" },
+        "location": { "type": "string" },
+        "salary": { "type": "string" },
+        "description": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "languageRequirements": { "type": "string", "enum": ["N1", "N2", "N3", "N4", "N5", "None"] },
+        "sourceUrl": { "type": "string" },
+        "postedAt": { "type": "number" }
+      },
+      "required": ["id", "title", "company", "location", "description", "skills", "postedAt"]
+    },
+    "Application": {
+      "title": "Job Application",
+      "description": "Tracks a user's application to a specific job.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "jobId": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "companyName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Applied", "Interview", "Rejected", "Offer", "Saved"] },
+        "notes": { "type": "string" },
+        "appliedAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "jobId", "jobTitle", "companyName", "status", "appliedAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual user profiles."
+    },
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "Public job listings."
+    },
+    "/applications/{applicationId}": {
+      "schema": "Application",
+      "description": "Private application tracking for users."
+    }
+  }
+}

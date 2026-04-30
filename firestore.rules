@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Helper Primitives
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    // Removed email_verified requirement for better UX on first signup
+    function isVerifiedUser() { return isSignedIn(); }
+
+    // 2. Validation Helpers
+    function isValidUserProfile(data) {
+      return data.id == request.auth.uid
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 100
+        && (data.get('jlptLevel', 'None') in ['N1', 'N2', 'N3', 'N4', 'N5', 'None'])
+        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 2000)
+        && (data.get('masterResume', '') is string && data.get('masterResume', '').size() <= 50000)
+        && (data.get('rirekisho', '') is string && data.get('rirekisho', '').size() <= 60000)
+        && (data.get('shokumu', '') is string && data.get('shokumu', '').size() <= 60000)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+       return data.keys().hasAll(['id', 'userId', 'title', 'message', 'type', 'read', 'createdAt'])
+        && data.userId == request.auth.uid
+        && data.title is string && data.title.size() <= 200
+        && data.read is bool;
+    }
+
+    function isValidApplication(data) {
+      return data.keys().hasAll(['id', 'userId', 'jobId', 'jobTitle', 'companyName', 'status', 'appliedAt', 'updatedAt'])
+        && data.userId == request.auth.uid
+        && data.status in ['Applied', 'Interview', 'Rejected', 'Offer', 'Saved']
+        && data.jobTitle is string && data.jobTitle.size() <= 100
+        && data.companyName is string && data.companyName.size() <= 100
+        && (data.get('location', '') is string && data.get('location', '').size() <= 200)
+        && (data.get('salary', '') is string && data.get('salary', '').size() <= 100)
+        && (data.get('notes', '') is string && data.get('notes', '').size() <= 5000)
+        && data.appliedAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // 1. Master Gate Patterns
+    
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if isOwner(userId) && isValidUserProfile(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'skills', 'masterResume', 'rirekisho', 'shokumu', 'jlptLevel', 'preferredLocations', 'updatedAt', 'photoURL']))
+        && incoming().updatedAt == request.time;
+    }
+
+    match /notifications/{notifId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && existing().userId == request.auth.uid 
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /jobs/{jobId} {
+      allow get, list: if isSignedIn();
+      // No user-level write access to jobs
+    }
+
+    match /applications/{applicationId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && isValidApplication(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().appliedAt == request.time
+        && isValidId(applicationId);
+        
+      allow update: if isSignedIn() && existing().userId == request.auth.uid
+        && isValidApplication(incoming())
+        && incoming().userId == existing().userId
+        && incoming().appliedAt == existing().appliedAt
+        && incoming().updatedAt == request.time
+        && (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes', 'location', 'salary', 'updatedAt']));
+        
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}
