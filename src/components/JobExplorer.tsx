@@ -49,6 +49,30 @@ export default function JobExplorer() {
   const { user } = useAuth();
   const [applyingId, setApplyingId] = React.useState<string | null>(null);
   const [appliedIds, setAppliedIds] = React.useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [locationFilter, setLocationFilter] = React.useState('All');
+  const [salaryFilter, setSalaryFilter] = React.useState('All');
+
+  const filteredJobs = MOCK_JOBS.filter(job => {
+    const matchesSearch = 
+      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      job.description.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesLocation = locationFilter === 'All' || job.location.includes(locationFilter);
+    
+    // Simple salary parser for the mock data
+    const matchesSalary = salaryFilter === 'All' || (() => {
+      const jobSalaryNum = parseInt(job.salary.replace(/[^0-9]/g, ''));
+      if (salaryFilter === '5M+') return jobSalaryNum >= 5;
+      if (salaryFilter === '8M+') return jobSalaryNum >= 8;
+      if (salaryFilter === '10M+') return jobSalaryNum >= 10;
+      return true;
+    })();
+
+    return matchesSearch && matchesLocation && matchesSalary;
+  });
 
   const handleApply = async (job: typeof MOCK_JOBS[0]) => {
     if (!user) return;
@@ -90,19 +114,47 @@ export default function JobExplorer() {
           <input 
             type="text" 
             placeholder="Search roles, skills, or companies..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-900 border-none rounded-2xl py-4 pl-12 pr-6 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
           />
         </div>
         <div className="flex gap-4 w-full md:w-auto">
-          <button className="flex-1 md:flex-none flex items-center justify-between gap-3 px-6 py-4 bg-slate-900 rounded-2xl border border-slate-700 text-sm font-bold text-slate-400 min-w-[140px] hover:text-white transition-colors">
-            Location
-            <ChevronDown className="w-4 h-4" />
-          </button>
-          <button className="flex-1 md:flex-none flex items-center justify-between gap-3 px-6 py-4 bg-slate-900 rounded-2xl border border-slate-700 text-sm font-bold text-slate-400 min-w-[140px] hover:text-white transition-colors">
-            Salary
-            <ChevronDown className="w-4 h-4" />
-          </button>
-          <button className="p-4 bg-indigo-600 rounded-2xl text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">
+          <div className="relative flex-1 md:flex-none min-w-[140px]">
+            <select 
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="w-full appearance-none flex items-center justify-between gap-3 px-6 py-4 bg-slate-900 rounded-2xl border border-slate-700 text-sm font-bold text-white transition-colors outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="All">All Locations</option>
+              <option value="Tokyo">Tokyo</option>
+              <option value="Osaka">Osaka</option>
+              <option value="Remote">Remote</option>
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+          </div>
+          <div className="relative flex-1 md:flex-none min-w-[140px]">
+            <select 
+              value={salaryFilter}
+              onChange={(e) => setSalaryFilter(e.target.value)}
+              className="w-full appearance-none flex items-center justify-between gap-3 px-6 py-4 bg-slate-900 rounded-2xl border border-slate-700 text-sm font-bold text-white transition-colors outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="All">All Salaries</option>
+              <option value="5M+">¥5M+</option>
+              <option value="8M+">¥8M+</option>
+              <option value="10M+">¥10M+</option>
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+          </div>
+          <button 
+            className="p-4 bg-indigo-600 rounded-2xl text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
+            onClick={() => {
+              setSearchQuery('');
+              setLocationFilter('All');
+              setSalaryFilter('All');
+            }}
+            title="Reset Filters"
+          >
             <Filter className="w-6 h-6" />
           </button>
         </div>
@@ -110,7 +162,7 @@ export default function JobExplorer() {
 
       {/* Results Header */}
       <div className="flex items-center justify-between">
-        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Found 42 Recommended Jobs</p>
+        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Found {filteredJobs.length} Recommended Jobs</p>
         <div className="flex items-center gap-2 text-xs font-bold text-indigo-400">
           <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
           AI Matches Updated Just Now
@@ -119,7 +171,12 @@ export default function JobExplorer() {
 
       {/* Job List */}
       <div className="grid grid-cols-1 gap-6">
-        {MOCK_JOBS.map((job) => (
+        {filteredJobs.length === 0 ? (
+          <div className="bg-slate-800/50 border border-slate-700 rounded-3xl p-20 text-center">
+            <Zap className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">No matching jobs found. Try adjusting your filters.</p>
+          </div>
+        ) : filteredJobs.map((job) => (
           <motion.div 
             key={job.id}
             whileHover={{ x: 4 }}
