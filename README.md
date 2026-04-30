@@ -4,6 +4,8 @@
 
 JobAI Japan is a high-performance web platform designed to streamline the job hunting experience for international professionals targeting the Japanese market. It combines artificial intelligence with a clean, industrial design to manage the entire career lifecycle—from document translation to application tracking.
 
+<img width="2726" height="1532" alt="jobai-png" src="https://github.com/user-attachments/assets/2d552741-df82-4e27-b2ed-e1e2d3ce0e96" />
+
 ## 🚀 Core Features
 
 ### 📄 AI Document Hub
